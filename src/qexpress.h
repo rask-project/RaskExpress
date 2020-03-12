@@ -10,9 +10,13 @@ QEX_BEGIN_NAMESPACE
 class QEXPRESS_EXPORT QExpress
 {
     QCoreApplication m_application;
-    QExpressServer m_server;
+    QExpressServer *m_server;
+
 public:
     QExpress(int argc, char *argv[]);
+    ~QExpress();
+
+    int start();
 };
 
 QEX_END_NAMESPACE
