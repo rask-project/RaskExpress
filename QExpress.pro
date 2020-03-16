@@ -18,13 +18,18 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    src/httpparser.cpp \
+    src/httprequest.cpp \
     src/qexpress.cpp \
     src/qexpressserver.cpp
 
 HEADERS += \
+    src/httpparser.h \
+    src/httprequest.h \
     src/qexpress.h \
     src/qexpress_global.h \
-    src/qexpressserver.h
+    src/qexpressserver.h \
+    src/qexpress_consts.h
 
 # Default rules for deployment
 macx {
@@ -38,3 +43,4 @@ QMAKE_CXXFLAGS_RELEASE -= -O2
 QMAKE_CXXFLAGS_RELEASE += -O3
 
 !isEmpty(target.path): INSTALLS += target
+!isEmpty(headers.path): INSTALLS += headers

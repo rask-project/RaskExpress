@@ -12,6 +12,9 @@ class QEXPRESS_EXPORT QExpress
     QCoreApplication m_application;
     QExpressServer *m_server;
 
+    const QHostAddress m_host;
+    const int m_port;
+
 public:
     QExpress(int argc, char *argv[]);
     ~QExpress();
