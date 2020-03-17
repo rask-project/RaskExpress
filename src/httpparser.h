@@ -24,7 +24,6 @@ class QEXPRESS_EXPORT HttpParser
     QMultiMap<QByteArray, QByteArray> m_header;
     QMultiMap<QByteArray, QByteArray> m_body;
     QMultiMap<QByteArray, QByteArray> m_query;
-    QMultiMap<QByteArray, QByteArray> m_parameters;
     QMultiMap<QByteArray, QMultiMap<QByteArray, QByteArray>> m_files;
 
 public:
@@ -35,6 +34,7 @@ public:
 private:
     bool parseHttpData(QByteArray &data);
     void parseHeader();
+    void parseUrl();
     void parseBody();
     void parseMultiPart();
     void extractCookies();

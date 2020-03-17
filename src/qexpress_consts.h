@@ -138,6 +138,7 @@ namespace HTTP
     const QByteArray CONTENT_DISPOSITION_COLON        = "Content-Disposition:";
     const QByteArray CONTENT_DISPOSITION_COLON_SPACE  = "Content-Disposition: ";
     const QByteArray MULTIPART                        = "multipart";
+    const QByteArray BOUNDARY                         = "boundary";
     const QByteArray URLENCODED                       = "urlencoded";
     const QByteArray COOKIE                           = "Cookie";
     const QByteArray SET_COOKIE                       = "Set-Cookie: ";

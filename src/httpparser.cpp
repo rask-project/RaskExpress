@@ -17,16 +17,23 @@ HttpParser::HttpParser(QByteArray &data):
     m_header(),
     m_body(),
     m_query(),
-    m_parameters(),
     m_files()
 {
     if (parseHttpData(data)) {
         parseHeader();
+        parseUrl();
         parseBody();
 
         if (m_multiPart)
             parseMultiPart();
     }
+
+    qDebug() << "URL:" << m_url;
+    qDebug() << "Method:" << m_method;
+    qDebug() << "Header:" << m_header;
+    qDebug() << "Query:" << m_query;
+    qDebug() << "Body:" << m_body;
+    qDebug() << "Files:" << m_files;
 }
 
 bool HttpParser::parseHttpData(QByteArray &data)
@@ -38,7 +45,7 @@ bool HttpParser::parseHttpData(QByteArray &data)
         m_bodyString = data.mid(index, size);
 
         data.remove(index, size);
-        m_headerString = data;
+        m_headerString = std::move(data);
 
         m_valid = true;
     } else {
@@ -53,8 +60,10 @@ void HttpParser::parseHeader()
     QByteArrayList lines(m_headerString.split('\n'));
 
     QByteArrayList firstLine;
-    if (!lines.empty())
+    if (!lines.empty()) {
         firstLine = lines.at(0).split(' ');
+        lines.removeAt(0);
+    }
     if (firstLine.size() < 3) {
         m_valid = false;
         return;
@@ -64,13 +73,23 @@ void HttpParser::parseHeader()
     m_url = std::move(firstLine[1]);
     m_httpVersion = std::move(firstLine[2]);
 
-    const int size = lines.size();
-    for (int i = 1, column = 0; i < size; ++i) {
-        QByteArray &line = lines[i];
-        if (line.isEmpty())
-            continue;
-        column = line.indexOf(':');
-        m_header.insert(line.left(column).trimmed(), line.mid(column + 1).trimmed());
+    for (QByteArray& line: lines) {
+        int colonPos = line.indexOf(':');
+        if (colonPos > -1) {
+            QByteArray key(line.left(colonPos).trimmed());
+            QByteArray value(line.mid(colonPos + 1).trimmed());
+
+            if (key == HTTP::CONTENT_TYPE) {
+                if (value.contains(HTTP::BOUNDARY)) {
+                    QByteArrayList contentTypeSplit(value.split(';'));
+                    value = std::move(contentTypeSplit[0]);
+
+                    QByteArrayList boundaryList = contentTypeSplit[1].trimmed().split('=');
+                    m_header.insert(std::move(boundaryList[0]), std::move(boundaryList[1]));
+                }
+            }
+            m_header.insert(std::move(key), std::move(value));
+        }
     }
 
     m_contentLength = m_header.value(HTTP::CONTENT_LENGTH).toLongLong();
@@ -82,17 +101,41 @@ void HttpParser::parseHeader()
     m_headerString.clear();
 }
 
+void HttpParser::parseUrl()
+{
+    if (m_url.contains('?')) {
+        QByteArrayList urlSplited(m_url.split('?'));
+        m_url = std::move(urlSplited[0]);
+
+        QByteArrayList queryStringList(urlSplited[1].split('&'));
+        for (QByteArray& query: queryStringList) {
+            QByteArrayList querySplited(query.split('='));
+            if (querySplited.size() == 2)
+                m_query.insert(std::move(querySplited[0]), std::move(queryDecoded(querySplited[1])));
+            else
+                m_query.insert(std::move(querySplited[0]), "");
+        }
+    }
+}
+
 void HttpParser::parseBody()
 {
     if (m_contentType.contains(HTTP::URLENCODED)) {
         if (m_bodyString.contains("&")) {
             QByteArrayList bodyAmpersendSplit(m_bodyString.split('&'));
-            for (int i = 0; i < bodyAmpersendSplit.size(); ++i) {
-                QByteArrayList bodySplited(bodyAmpersendSplit[i].split('='));
-                if (bodySplited.size() == 2)
-                    m_body.insert(bodySplited.first(), queryDecoded(bodySplited.last()));
-                else if (bodySplited.size() == 1)
-                    m_body.insert(bodySplited.first(), "");
+            for (QByteArray& item: bodyAmpersendSplit) {
+                QByteArrayList itemSplited(item.split('='));
+                if (itemSplited.size() == 2) {
+                    if (m_method == HTTP::METHOD::GET)
+                        m_query.insert(std::move(itemSplited[0]), std::move(queryDecoded(itemSplited[1])));
+                    else
+                        m_body.insert(std::move(itemSplited[0]), std::move(queryDecoded(itemSplited[1])));
+                } else {
+                    if (m_method == HTTP::METHOD::GET)
+                        m_query.insert(std::move(itemSplited[0]), "");
+                    else
+                        m_body.insert(std::move(itemSplited[0]), "");
+                }
             }
         } else {
             QByteArrayList bodySplited(m_bodyString.split('='));
@@ -109,16 +152,17 @@ void HttpParser::parseMultiPart()
     if (m_bodyString.size() == m_contentLength) {
         QStringList listFormData;
         QString boundary;
-        if (!m_bodyString.startsWith(HTTP::CONTENT_DISPOSITION_COLON)) {
-            boundary = m_bodyString.mid(0, m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON));
-            m_bodyString.replace(boundary, "");
-//            boundary.replace("\r\n", "");
-        }
+
+        m_bodyString
+                .replace("--" + m_header.value(HTTP::BOUNDARY) + "--\r\n", "")
+                .replace("--" + m_header.value(HTTP::BOUNDARY) + "\r\n", "");
 
         m_bodyString.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
         int contentFormDataPos = m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
+
         do {
             QByteArray item = m_bodyString.mid(0, contentFormDataPos);
+
             if (item.startsWith(HTTP::FORM_DATA_NAME_EQUAL)) {
                 item.remove(0, HTTP::FORM_DATA_NAME_EQUAL.size());
 
@@ -127,15 +171,15 @@ void HttpParser::parseMultiPart()
                 item.remove(0, separatorPos + HTTP::FORM_DATA_SEPARATOR.size());
 
                 if (key.contains(';')) {
-                    QMultiMap<QByteArray, QByteArray> fileRequest;
-
                     int semicolonPos = key.indexOf(';');
                     QByteArray fieldName = key.mid(0, semicolonPos);
                     key.remove(0, semicolonPos + 1);
 
                     key.replace(HTTP::END_LINE, ";");
                     QByteArrayList fileData(key.trimmed().split(';'));
+                    QMultiMap<QByteArray, QByteArray> fileRequest;
                     for (QByteArray& itemFile: fileData) {
+                        qDebug() << itemFile;
                         if (itemFile.contains(HTTP::FILENAME_EQUAL)) {
                             int filenamePos = itemFile.indexOf(HTTP::FILENAME_EQUAL);
                             itemFile.remove(0, filenamePos + HTTP::FILENAME_EQUAL.size());
@@ -159,14 +203,10 @@ void HttpParser::parseMultiPart()
             contentFormDataPos = m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
         } while (contentFormDataPos > -1);
     }
-
-    qDebug() << m_files;
-    qDebug() << m_body;
 }
 
 void HttpParser::extractCookies()
 {
-
 }
 
 QByteArray& HttpParser::queryDecoded(QByteArray& query) {
