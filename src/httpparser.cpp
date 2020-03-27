@@ -2,6 +2,9 @@
 #include "qexpress_consts.h"
 
 #include <QUrl>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QDebug>
 
 QEX_BEGIN_NAMESPACE
@@ -15,6 +18,7 @@ HttpParser::HttpParser(QByteArray &data):
     m_contentType(),
     m_contentLength(0),
     m_header(),
+    m_params(),
     m_body(),
     m_query(),
     m_files()
@@ -27,13 +31,6 @@ HttpParser::HttpParser(QByteArray &data):
         if (m_multiPart)
             parseMultiPart();
     }
-
-    qDebug() << "URL:" << m_url;
-    qDebug() << "Method:" << m_method;
-    qDebug() << "Header:" << m_header;
-    qDebug() << "Query:" << m_query;
-    qDebug() << "Body:" << m_body;
-    qDebug() << "Files:" << m_files;
 }
 
 bool HttpParser::parseHttpData(QByteArray &data)
@@ -96,6 +93,9 @@ void HttpParser::parseHeader()
     m_contentType = m_header.value(HTTP::CONTENT_TYPE);
     m_multiPart = m_contentType.contains(HTTP::MULTIPART);
 
+    if (m_method != HTTP::METHOD::POST && m_method != HTTP::METHOD::PUT && m_method != HTTP::METHOD::PATCH)
+        m_bodyString.clear();
+
     if (m_header.contains(HTTP::COOKIE))
         extractCookies();
     m_headerString.clear();
@@ -126,24 +126,24 @@ void HttpParser::parseBody()
             for (QByteArray& item: bodyAmpersendSplit) {
                 QByteArrayList itemSplited(item.split('='));
                 if (itemSplited.size() == 2) {
-                    if (m_method == HTTP::METHOD::GET)
-                        m_query.insert(std::move(itemSplited[0]), std::move(queryDecoded(itemSplited[1])));
-                    else
-                        m_body.insert(std::move(itemSplited[0]), std::move(queryDecoded(itemSplited[1])));
+                    m_body.insert(std::move(itemSplited[0]), std::move(queryDecoded(itemSplited[1])));
                 } else {
-                    if (m_method == HTTP::METHOD::GET)
-                        m_query.insert(std::move(itemSplited[0]), "");
-                    else
-                        m_body.insert(std::move(itemSplited[0]), "");
+                    m_body.insert(std::move(itemSplited[0]), "");
                 }
             }
         } else {
             QByteArrayList bodySplited(m_bodyString.split('='));
             if (bodySplited.size() == 2)
-                m_body.insert(bodySplited.first(), queryDecoded(bodySplited.last()));
+                m_body.insert(std::move(bodySplited.first()), std::move(bodySplited.last()));
             else
-                m_body.insert(bodySplited.first(), "");
+                m_body.insert(std::move(bodySplited.first()), "");
         }
+    } else if (m_contentType.contains(HTTP::APPLICATION_JSON)) {
+        QJsonDocument doc = QJsonDocument::fromJson(m_bodyString);
+        if (doc.isObject())
+            m_bodyJson = doc.object();
+        else if (doc.isArray())
+            m_bodyJson = doc.array();
     }
 }
 
@@ -179,7 +179,6 @@ void HttpParser::parseMultiPart()
                     QByteArrayList fileData(key.trimmed().split(';'));
                     QMultiMap<QByteArray, QByteArray> fileRequest;
                     for (QByteArray& itemFile: fileData) {
-                        qDebug() << itemFile;
                         if (itemFile.contains(HTTP::FILENAME_EQUAL)) {
                             int filenamePos = itemFile.indexOf(HTTP::FILENAME_EQUAL);
                             itemFile.remove(0, filenamePos + HTTP::FILENAME_EQUAL.size());

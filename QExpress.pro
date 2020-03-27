@@ -21,7 +21,10 @@ SOURCES += \
     src/httpparser.cpp \
     src/httprequest.cpp \
     src/qexpress.cpp \
-    src/qexpressserver.cpp
+    src/qexpressserver.cpp \
+    src/response.cpp \
+    src/router.cpp \
+    src/urlparser.cpp
 
 HEADERS += \
     src/httpparser.h \
@@ -29,7 +32,11 @@ HEADERS += \
     src/qexpress.h \
     src/qexpress_global.h \
     src/qexpressserver.h \
-    src/qexpress_consts.h
+    src/qexpress_consts.h \
+    src/request.h \
+    src/response.h \
+    src/router.h \
+    src/urlparser.h
 
 # Default rules for deployment
 macx {

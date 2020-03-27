@@ -35,88 +35,6 @@ namespace GET_SET
     const QString SET_UPPER = "SET";
 }
 
-//STATUS CONSTANTS
-namespace STATUS
-{
-    const QByteArray  STATUS_401  = "401 Not Authorized";
-    const QByteArray  STATUS_403  = "403 Forbbiden";
-    const QByteArray  STATUS_404  = "404 Not Found";
-    const QByteArray  NOT_FOUND   = "Not Found";
-
-    enum class CODE {
-        // 1xx: Informational
-        Continue = 100,
-        SwitchingProtocols,
-        Processing,
-
-        // 2xx: Success
-        Ok = 200,
-        Created,
-        Accepted,
-        NonAuthoritativeInformation,
-        NoContent,
-        ResetContent,
-        PartialContent,
-        MultiStatus,
-        AlreadyReported,
-        IMUsed = 226,
-
-        // 3xx: Redirection
-        MultipleChoices = 300,
-        MovedPermanently,
-        Found,
-        SeeOther,
-        NotModified,
-        UseProxy,
-        // 306: not used, was proposed as "Switch Proxy" but never standardized
-        TemporaryRedirect = 307,
-        PermanentRedirect,
-
-        // 4xx: Client Error
-        BadRequest = 400,
-        Unauthorized,
-        PaymentRequired,
-        Forbidden,
-        NotFound,
-        MethodNotAllowed,
-        NotAcceptable,
-        ProxyAuthenticationRequired,
-        RequestTimeout,
-        Conflict,
-        Gone,
-        LengthRequired,
-        PreconditionFailed,
-        PayloadTooLarge,
-        UriTooLong,
-        UnsupportedMediaType,
-        RequestRangeNotSatisfiable,
-        ExpectationFailed,
-        ImATeapot,
-        MisdirectedRequest = 421,
-        UnprocessableEntity,
-        Locked,
-        FailedDependency,
-        UpgradeRequired = 426,
-        PreconditionRequired = 428,
-        TooManyRequests,
-        RequestHeaderFieldsTooLarge = 431,
-        UnavailableForLegalReasons = 451,
-
-        // 5xx: Server Error
-        InternalServerError = 500,
-        NotImplemented,
-        BadGateway,
-        ServiceUnavailable,
-        GatewayTimeout,
-        HttpVersionNotSupported,
-        VariantAlsoNegotiates,
-        InsufficientStorage,
-        LoopDetected,
-        NotExtended = 510,
-        NetworkAuthenticationRequired,
-        NetworkConnectTimeoutError = 599,
-    };
-}
 
 //CONTENT TYPE CONSTANTS
 namespace HTTP
@@ -124,6 +42,7 @@ namespace HTTP
     const QByteArray SERVER                           = "Server";
     const QByteArray SERVER_VERSION                   = "QExpress/1.0";
     const QByteArray DATA                             = "Data";
+    const QByteArray DATE                             = "Date";
     const QByteArray TRANSFER_ENCODING                = "Transfer-Encoding";
     const QByteArray CHUNKED                          = "chunked";
     const QByteArray END_LINE                         = "\r\n";
@@ -134,6 +53,7 @@ namespace HTTP
     const QByteArray CONTENT_TYPE                     = "Content-Type";
     const QByteArray CONTENT_TYPE_COLON_SPACE         = "Content-Type: ";
     const QByteArray CONTENT_LENGTH                   = "Content-Length";
+    const QByteArray CONTENT_ENCODING                 = "Content-Encoding";
     const QByteArray CONTENT_DISPOSITION              = "Content-Disposition";
     const QByteArray CONTENT_DISPOSITION_COLON        = "Content-Disposition:";
     const QByteArray CONTENT_DISPOSITION_COLON_SPACE  = "Content-Disposition: ";
@@ -161,9 +81,6 @@ namespace HTTP
     const QByteArray            = "";
     const QByteArray            = "";
     */
-
-    //TEXT
-    const QByteArray TEXT_HTML_UTF8       = "text/html; charset=UTF-8";
 
     //IMAGE
     const QByteArray IMAGE_MICROSOFT_ICO    = "image/vnd.microsoft.icon";
@@ -203,11 +120,173 @@ namespace HTTP
         const QByteArray GET     = "GET";
         const QByteArray PUT     = "PUT";
         const QByteArray POST    = "POST";
+        const QByteArray PATCH   = "PATCH";
         const QByteArray DELETE  = "DELETE";
         const QByteArray OPTIONS = "OPTIONS";
         const QByteArray HEAD    = "HEAD";
         const QByteArray TRACE   = "TRACE";
     }
+
+//    namespace CONTENT_TYPE
+//    {
+//        const QByteArray TEXT_HTML_UTF8 = "text/html; charset=UTF-8";
+//    };
+
+    namespace RESPONSE
+    {
+        namespace CONTENT_TYPE
+        {
+            const QByteArray TEXT_HTML_UTF8             = "text/html; charset=UTF-8";
+            const QByteArray TEXT_PLAIN_UTF8            = "text/plain; charset=UTF-8";
+            const QByteArray APPLICATION_JSON_UTF8      = "application/json; charset=UTF-8";
+        }
+    }
+
+    struct STATUS
+    {
+        enum CODE: int {
+            // 1xx: Informational
+            Continue = 100,
+            SwitchingProtocols,
+            Processing,
+            // 2xx: Success
+            Ok = 200,
+            Created,
+            Accepted,
+            NonAuthoritativeInformation,
+            NoContent,
+            ResetContent,
+            PartialContent,
+            MultiStatus,
+            AlreadyReported,
+            IMUsed = 226,
+            // 3xx: Redirection
+            MultipleChoices = 300,
+            MovedPermanently,
+            Found,
+            SeeOther,
+            NotModified,
+            UseProxy,
+            // 306: not used, was proposed as "Switch Proxy" but never standardized
+            TemporaryRedirect = 307,
+            PermanentRedirect,
+            // 4xx: Client Error
+            BadRequest = 400,
+            Unauthorized,
+            PaymentRequired,
+            Forbidden,
+            NotFound,
+            MethodNotAllowed,
+            NotAcceptable,
+            ProxyAuthenticationRequired,
+            RequestTimeout,
+            Conflict,
+            Gone,
+            LengthRequired,
+            PreconditionFailed,
+            PayloadTooLarge,
+            UriTooLong,
+            UnsupportedMediaType,
+            RequestRangeNotSatisfiable,
+            ExpectationFailed,
+            ImATeapot,
+            MisdirectedRequest = 421,
+            UnprocessableEntity,
+            Locked,
+            FailedDependency,
+            UpgradeRequired = 426,
+            PreconditionRequired = 428,
+            TooManyRequests,
+            RequestHeaderFieldsTooLarge = 431,
+            UnavailableForLegalReasons = 451,
+            // 5xx: Server Error
+            InternalServerError = 500,
+            NotImplemented,
+            BadGateway,
+            ServiceUnavailable,
+            GatewayTimeout,
+            HttpVersionNotSupported,
+            VariantAlsoNegotiates,
+            InsufficientStorage,
+            LoopDetected,
+            NotExtended = 510,
+            NetworkAuthenticationRequired,
+            NetworkConnectTimeoutError = 599,
+        };
+
+        template<typename T>
+        static QByteArray TEXT(T code) {
+            switch (code) {
+            case CODE::Continue: return "Continue";
+            case CODE::SwitchingProtocols: return "Switching Protocols";
+            case CODE::Processing: return "Processing";
+            //2xx: Succes
+            case CODE::Ok: return "Ok";
+            case CODE::Created: return "Created";
+            case CODE::Accepted: return "Accepted";
+            case CODE::NonAuthoritativeInformation: return "Non-Authoritative Information";
+            case CODE::NoContent: return "No Content";
+            case CODE::ResetContent: return "Reset Content";
+            case CODE::PartialContent: return "Partial Content";
+            case CODE::MultiStatus: return "Multi Status";
+            case CODE::AlreadyReported: return "Already Reported";
+            case CODE::IMUsed: return "IM Used";
+            // 3xx: Redirectio
+            case CODE::MultipleChoices: return "Multiple Choices";
+            case CODE::MovedPermanently: return "Moved Permanently";
+            case CODE::Found: return "Found";
+            case CODE::SeeOther: return "See Other";
+            case CODE::NotModified: return "Not Modified";
+            case CODE::UseProxy: return "Use Proxy";
+            // 306: not used, was proposed as "Switch Pr
+            case CODE::TemporaryRedirect: return "Temporary Redirect";
+            case CODE::PermanentRedirect: return "Permanent Redirect";
+            // 4xx: Client Erro
+            case CODE::BadRequest: return "Bad Request";
+            case CODE::Unauthorized: return "Unauthorized";
+            case CODE::PaymentRequired: return "Payment Required";
+            case CODE::Forbidden: return "Forbidden";
+            case CODE::NotFound: return "Not Found";
+            case CODE::MethodNotAllowed: return "Method Not Allowed";
+            case CODE::NotAcceptable: return "Not Acceptable";
+            case CODE::ProxyAuthenticationRequired: return "Proxy Authentication Required";
+            case CODE::RequestTimeout: return "Request Timeout";
+            case CODE::Conflict: return "Conflict";
+            case CODE::Gone: return "Gone";
+            case CODE::LengthRequired: return "Length Required";
+            case CODE::PreconditionFailed: return "Precondition Failed";
+            case CODE::PayloadTooLarge: return "Payload Too Large";
+            case CODE::UriTooLong: return "Uri Too Long";
+            case CODE::UnsupportedMediaType: return "Unsupported Media Type";
+            case CODE::RequestRangeNotSatisfiable: return "Request Range Not Satisfiable";
+            case CODE::ExpectationFailed: return "Expectation Failed";
+            case CODE::ImATeapot: return "ImA Teapot";
+            case CODE::MisdirectedRequest: return "Misdirected Request";
+            case CODE::UnprocessableEntity: return "Unprocessable Entity";
+            case CODE::Locked: return "Locked";
+            case CODE::FailedDependency: return "Failed Dependency";
+            case CODE::UpgradeRequired: return "Upgrade Required";
+            case CODE::PreconditionRequired: return "Precondition Required";
+            case CODE::TooManyRequests: return "Too Many Requests";
+            case CODE::RequestHeaderFieldsTooLarge: return "Request Header Fields Too Large";
+            case CODE::UnavailableForLegalReasons: return "Unavailable For Legal Reasons";
+            // 5xx: Server Erro
+            case CODE::InternalServerError: return "Internal Server Error";
+            case CODE::NotImplemented: return "Not Implemented";
+            case CODE::BadGateway: return "Bad Gateway";
+            case CODE::ServiceUnavailable: return "Service Unavailable";
+            case CODE::GatewayTimeout: return "Gateway Timeout";
+            case CODE::HttpVersionNotSupported: return "Http Version Not Supported";
+            case CODE::VariantAlsoNegotiates: return "Variant Also Negotiates";
+            case CODE::InsufficientStorage: return "Insufficient Storage";
+            case CODE::LoopDetected: return "Loop Detected";
+            case CODE::NotExtended: return "Not Extended";
+            case CODE::NetworkAuthenticationRequired: return "Network Authentication Required";
+            case CODE::NetworkConnectTimeoutError: return "Network Connect Timeout Error";
+            }
+            return "";
+        }
+    };
 }
 
 namespace COOKIE
