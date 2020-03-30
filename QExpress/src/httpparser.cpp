@@ -7,6 +7,8 @@
 #include <QJsonObject>
 #include <QDebug>
 
+#include <QFile>
+
 QEX_BEGIN_NAMESPACE
 
 HttpParser::HttpParser(QByteArray &data):
@@ -23,6 +25,7 @@ HttpParser::HttpParser(QByteArray &data):
     m_query(),
     m_files()
 {
+    m_time = std::chrono::high_resolution_clock::now();
     if (parseHttpData(data)) {
         parseHeader();
         parseUrl();
@@ -149,59 +152,68 @@ void HttpParser::parseBody()
 
 void HttpParser::parseMultiPart()
 {
-    if (m_bodyString.size() == m_contentLength) {
-        QStringList listFormData;
-        QString boundary;
+//    if (m_bodyString.size() == m_contentLength) {
+//    }
+    QStringList listFormData;
+    QString boundary;
 
-        m_bodyString
-                .replace("--" + m_header.value(HTTP::BOUNDARY) + "--\r\n", "")
-                .replace("--" + m_header.value(HTTP::BOUNDARY) + "\r\n", "");
+    m_bodyString
+            .replace("--" + m_header.value(HTTP::BOUNDARY) + "--\r\n", "")
+            .replace("--" + m_header.value(HTTP::BOUNDARY) + "\r\n", "");
 
-        m_bodyString.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
-        int contentFormDataPos = m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
+    m_bodyString.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
+    int contentFormDataPos = m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
 
-        do {
-            QByteArray item = m_bodyString.mid(0, contentFormDataPos);
+    do {
+        QByteArray item = m_bodyString.mid(0, contentFormDataPos);
 
-            if (item.startsWith(HTTP::FORM_DATA_NAME_EQUAL)) {
-                item.remove(0, HTTP::FORM_DATA_NAME_EQUAL.size());
+        if (item.startsWith(HTTP::FORM_DATA_NAME_EQUAL)) {
+            item.remove(0, HTTP::FORM_DATA_NAME_EQUAL.size());
 
-                int separatorPos = item.indexOf(HTTP::FORM_DATA_SEPARATOR);
-                QByteArray key = item.mid(0, separatorPos).replace("\"", "");
-                item.remove(0, separatorPos + HTTP::FORM_DATA_SEPARATOR.size());
+            int separatorPos = item.indexOf(HTTP::FORM_DATA_SEPARATOR);
+            QByteArray key = item.mid(0, separatorPos).replace("\"", "");
+            item.remove(0, separatorPos + HTTP::FORM_DATA_SEPARATOR.size());
 
-                if (key.contains(';')) {
-                    int semicolonPos = key.indexOf(';');
-                    QByteArray fieldName = key.mid(0, semicolonPos);
-                    key.remove(0, semicolonPos + 1);
+            if (key.contains(';')) {
+                int semicolonPos = key.indexOf(';');
+                QByteArray fieldName = key.mid(0, semicolonPos);
+                key.remove(0, semicolonPos + 1);
 
-                    key.replace(HTTP::END_LINE, ";");
-                    QByteArrayList fileData(key.trimmed().split(';'));
-                    QMultiMap<QByteArray, QByteArray> fileRequest;
-                    for (QByteArray& itemFile: fileData) {
-                        if (itemFile.contains(HTTP::FILENAME_EQUAL)) {
-                            int filenamePos = itemFile.indexOf(HTTP::FILENAME_EQUAL);
-                            itemFile.remove(0, filenamePos + HTTP::FILENAME_EQUAL.size());
-                            fileRequest.insert(HTTP::FILENAME, std::move(itemFile));
-                        }
-                        if (itemFile.contains(HTTP::CONTENT_TYPE_COLON_SPACE)) {
-                            int contentTypePos = itemFile.indexOf(HTTP::CONTENT_TYPE_COLON_SPACE);
-                            itemFile.remove(0, contentTypePos + HTTP::CONTENT_TYPE_COLON_SPACE.size());
-                            fileRequest.insert(HTTP::CONTENT_TYPE, std::move(itemFile));
-                        }
+                key.replace(HTTP::END_LINE, ";");
+                QByteArrayList fileData(key.trimmed().split(';'));
+                QMultiMap<QByteArray, QByteArray> fileRequest;
+                for (QByteArray& itemFile: fileData) {
+                    if (itemFile.contains(HTTP::FILENAME_EQUAL)) {
+                        int filenamePos = itemFile.indexOf(HTTP::FILENAME_EQUAL);
+                        itemFile.remove(0, filenamePos + HTTP::FILENAME_EQUAL.size());
+                        fileRequest.insert(HTTP::FILENAME, std::move(itemFile));
                     }
-                    fileRequest.insert("content", item);
-                    m_files.insert(fieldName, std::move(fileRequest));
-                } else {
-                    m_body.insert(key, std::move(removeCharsFromEnd(item)));
+                    if (itemFile.contains(HTTP::CONTENT_TYPE_COLON_SPACE)) {
+                        int contentTypePos = itemFile.indexOf(HTTP::CONTENT_TYPE_COLON_SPACE);
+                        itemFile.remove(0, contentTypePos + HTTP::CONTENT_TYPE_COLON_SPACE.size());
+                        fileRequest.insert(HTTP::CONTENT_TYPE, std::move(itemFile));
+                    }
                 }
-            }
+                fileRequest.insert("content", item);
 
-            m_bodyString.remove(0, contentFormDataPos);
-            m_bodyString.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
-            contentFormDataPos = m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
-        } while (contentFormDataPos > -1);
-    }
+                QFile file(fieldName + ".jpg");
+                if (!file.open(QIODevice::WriteOnly)) {
+                    qWarning() << "Deu merda em salvar" << file.errorString();
+                } else {
+                    QTextStream in(&file);
+                    in << item;
+                }
+
+                m_files.insert(fieldName, std::move(fileRequest));
+            } else {
+                m_body.insert(key, std::move(removeCharsFromEnd(item)));
+            }
+        }
+
+        m_bodyString.remove(0, contentFormDataPos);
+        m_bodyString.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
+        contentFormDataPos = m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
+    } while (contentFormDataPos > -1);
 }
 
 void HttpParser::extractCookies()

@@ -1,8 +1,9 @@
 #ifndef HTTPPARSER_H
 #define HTTPPARSER_H
 
+#include <chrono>
 #include <QObject>
-#include <QMultiMap>
+#include <QMap>
 #include <QVector>
 #include <QByteArray>
 #include <QJsonValue>
@@ -22,12 +23,13 @@ class QEXPRESS_EXPORT HttpParser
     QByteArray m_headerString;
     QByteArray m_bodyString;
 
-    QMultiMap<QByteArray, QByteArray> m_header;
-    QMultiMap<QByteArray, QByteArray> m_params;
-    QMultiMap<QByteArray, QByteArray> m_body;
+    QMap<QByteArray, QByteArray> m_header;
+    QMap<QByteArray, QByteArray> m_params;
+    QMap<QByteArray, QByteArray> m_body;
     QJsonValue m_bodyJson;
-    QMultiMap<QByteArray, QByteArray> m_query;
+    QMap<QByteArray, QByteArray> m_query;
     QMultiMap<QByteArray, QMultiMap<QByteArray, QByteArray>> m_files;
+    std::chrono::high_resolution_clock::time_point m_time;
 
 public:
     HttpParser(QByteArray &data);
@@ -44,21 +46,23 @@ public:
 
     inline QByteArray& contentType() noexcept { return m_contentType; }
 
-    inline QMultiMap<QByteArray, QByteArray>& header() noexcept { return m_header; }
+    inline QMap<QByteArray, QByteArray>& header() noexcept { return m_header; }
 
-    inline QMultiMap<QByteArray, QByteArray>& body() noexcept { return m_body; }
+    inline QMap<QByteArray, QByteArray>& body() noexcept { return m_body; }
 
     inline QJsonValue bodyJson() noexcept { return m_bodyJson; };
 
-    inline QMultiMap<QByteArray, QByteArray>& query() noexcept { return m_query; }
+    inline QMap<QByteArray, QByteArray>& query() noexcept { return m_query; }
 
     inline QMultiMap<QByteArray, QMultiMap<QByteArray, QByteArray>>& files() noexcept { return m_files; }
 
-    inline QMultiMap<QByteArray, QByteArray>& params() { return m_params; }
+    inline QMap<QByteArray, QByteArray>& params() { return m_params; }
 
     inline QByteArray getParam(const QByteArray& key) { return m_params.value(key); }
 
     inline void setParams(const QMultiMap<QByteArray, QByteArray>& params) { m_params = params; }
+
+    inline std::chrono::high_resolution_clock::time_point& time() { return m_time; }
 
 private:
     bool parseHttpData(QByteArray &data);

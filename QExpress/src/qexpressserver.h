@@ -7,6 +7,7 @@
 #include <map>
 #include <algorithm>
 
+#include "config.h"
 #include "httprequest.h"
 #include "router.h"
 #include "qexpress_global.h"
@@ -18,9 +19,10 @@ class QExpressServer : public QTcpServer
 private:
     QThreadPool m_pool;
     std::map<QString, Router*> m_router;
+    Config m_config;
 
 public:
-    explicit QExpressServer();
+    explicit QExpressServer(Config& config);
     ~QExpressServer() override;
 
     inline void router(const QString &url, Router* router) noexcept { m_router[url] = router; }

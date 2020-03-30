@@ -39,7 +39,8 @@ namespace GET_SET
 //CONTENT TYPE CONSTANTS
 namespace HTTP
 {
-    const QByteArray SERVER                           = "Server";
+    const QByteArray SERVER                           = "QExpress";
+    const QByteArray VERSION                          = "1.0";
     const QByteArray SERVER_VERSION                   = "QExpress/1.0";
     const QByteArray DATA                             = "Data";
     const QByteArray DATE                             = "Date";

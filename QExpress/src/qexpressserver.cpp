@@ -2,11 +2,12 @@
 
 QEX_BEGIN_NAMESPACE
 
-QExpressServer::QExpressServer()
+QExpressServer::QExpressServer(Config &config):
+    m_config(config)
 {
     thread()->setPriority(QThread::TimeCriticalPriority);
-    m_pool.setMaxThreadCount(200);
-    m_pool.setExpiryTimeout(60000);
+    m_pool.setMaxThreadCount(m_config.config["maxThread"].toInt());
+    m_pool.setExpiryTimeout(m_config.config["timeout"].toInt());
 }
 
 QExpressServer::~QExpressServer()
@@ -17,7 +18,7 @@ QExpressServer::~QExpressServer()
 
 void QExpressServer::incomingConnection(qintptr handle)
 {
-    m_pool.start(new HttpRequest(handle, m_router), QThread::LowPriority);
+    m_pool.start(new HttpRequest(handle, m_config, m_router), QThread::LowPriority);
 }
 
 

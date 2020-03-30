@@ -1,5 +1,5 @@
-QT -= gui
-QT += network
+#QT -= gui
+QT += network gui
 
 TEMPLATE = lib
 DEFINES += QEXPRESS_LIBRARY
@@ -18,6 +18,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    src/config.cpp \
     src/httpparser.cpp \
     src/httprequest.cpp \
     src/qexpress.cpp \
@@ -27,6 +28,7 @@ SOURCES += \
     src/urlparser.cpp
 
 HEADERS += \
+    src/config.h \
     src/httpparser.h \
     src/httprequest.h \
     src/qexpress.h \
@@ -43,6 +45,12 @@ macx {
     headers.path   = /usr/local/lib/qexpress
     headers.files += $$HEADERS
     target.path    = /usr/local/lib
+}
+
+CONFIG(debug, debug|release) {
+    # active log context pour Application::ErrorMessageLog() en mode debug
+    DEFINES += QT_MESSAGELOGCONTEXT
+} else {
 }
 
 QMAKE_CXXFLAGS_RELEASE -= -O1

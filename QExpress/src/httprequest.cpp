@@ -1,6 +1,7 @@
 #include <functional>
 #include <QJsonObject>
-
+#include <QDataStream>
+#include <iostream>
 #include "httprequest.h"
 #include "httpparser.h"
 #include "request.h"
@@ -9,8 +10,9 @@
 
 QEX_BEGIN_NAMESPACE
 
-HttpRequest::HttpRequest(qintptr &handle, std::map<QString, Router *> &router):
+HttpRequest::HttpRequest(qintptr &handle, Config &config, std::map<QString, Router *> &router):
     m_handle(handle),
+    m_config(config),
     m_socket(nullptr),
     m_router(router)
 {}
@@ -25,16 +27,18 @@ void HttpRequest::run()
 {
     setSocket();
 
+    m_socket->setReadBufferSize(m_config.config["maxUploadSize"].toInt());
     if (m_socket->ConnectedState > 0) {
         if (m_socket->waitForReadyRead()) {
             QByteArray data;
-
             try {
+                m_socket->flush();
                 data = m_socket->readAll();
             } catch (const std::bad_alloc& error) {
                 qDebug() << "Error:" << error.what();
             }
 
+            std::cout << data.constData();
             HttpParser parser(data);
             routeMatch(parser);
         }
@@ -52,7 +56,6 @@ void HttpRequest::setSocket()
 void HttpRequest::routeMatch(HttpParser &parser)
 {
     Response response(*m_socket);
-
     if (!parser.isValid()) {
         response.status(HTTP::STATUS::CODE::BadRequest);
         response.send(HTTP::STATUS::TEXT(HTTP::STATUS::CODE::BadRequest));

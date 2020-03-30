@@ -113,6 +113,7 @@ void Response::writeByteArray(const QByteArray &data)
             m_socket.waitForBytesWritten();
         }
     }
+    m_time = std::chrono::high_resolution_clock::now();
 }
 
 void Response::closeConnection()

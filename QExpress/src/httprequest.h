@@ -5,6 +5,7 @@
 #include <map>
 #include <QTcpSocket>
 
+#include "config.h"
 #include "router.h"
 #include "qexpress_global.h"
 
@@ -13,11 +14,12 @@ QEX_BEGIN_NAMESPACE
 class HttpRequest : public QRunnable
 {
     qintptr m_handle;
+    Config m_config;
     QTcpSocket *m_socket;
     std::map<QString, Router*> m_router;
 
 public:
-    HttpRequest(qintptr &handle, std::map<QString, Router *> &router);
+    HttpRequest(qintptr &handle, Config& config, std::map<QString, Router *> &router);
     ~HttpRequest() override;
 
     void run() override;
