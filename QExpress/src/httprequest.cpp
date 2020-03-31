@@ -55,7 +55,8 @@ void HttpRequest::setSocket()
 
 void HttpRequest::routeMatch(HttpParser &parser)
 {
-    Response response(*m_socket);
+    Request request(parser);
+    Response response(*m_socket, request);
     if (!parser.isValid()) {
         response.status(HTTP::STATUS::CODE::BadRequest);
         response.send(HTTP::STATUS::TEXT(HTTP::STATUS::CODE::BadRequest));
@@ -76,7 +77,6 @@ void HttpRequest::routeMatch(HttpParser &parser)
                 if (requestFound) {
                     parser.setParams(urlParser.params());
 
-                    Request request(parser);
                     if (!runMiddlewares(route.middlewares, request, response))
                         return;
 

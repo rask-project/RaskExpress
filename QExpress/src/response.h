@@ -4,6 +4,7 @@
 #include <chrono>
 #include <QTcpSocket>
 #include <QJsonDocument>
+#include "request.h"
 #include "qexpress_consts.h"
 #include "qexpress_global.h"
 
@@ -12,6 +13,7 @@ QEX_BEGIN_NAMESPACE
 class QEXPRESS_EXPORT Response
 {
     QTcpSocket& m_socket;
+    Request& m_request;
     QByteArray m_content;
     QMap<QByteArray, QByteArray> m_headers;
     int m_statusCode;
@@ -20,7 +22,7 @@ class QEXPRESS_EXPORT Response
     std::chrono::high_resolution_clock::time_point m_time;
 
 public:
-    explicit Response(QTcpSocket& socket);
+    explicit Response(QTcpSocket& socket, Request& request);
     ~Response() noexcept {}
 
     inline void addHeader(const QByteArray& name, const QByteArray& value) { m_headers.insert(name, value); }
@@ -40,6 +42,7 @@ private:
     void sendHeaders();
     void writeByteArray(const QByteArray& data);
     void closeConnection();
+    void logResponse();
 };
 
 QEX_END_NAMESPACE

@@ -3,11 +3,12 @@
 
 QEX_BEGIN_NAMESPACE
 
-Response::Response(QTcpSocket &socket):
+Response::Response(QTcpSocket &socket, Request &request):
     m_socket(socket),
+    m_request(request),
     m_content(),
     m_headers(),
-    m_statusCode(200),
+    m_statusCode(HTTP::STATUS::CODE::Ok),
     m_statusText(),
     m_maxSizeResponse(32768)
 {}
@@ -113,13 +114,37 @@ void Response::writeByteArray(const QByteArray &data)
             m_socket.waitForBytesWritten();
         }
     }
-    m_time = std::chrono::high_resolution_clock::now();
 }
 
 void Response::closeConnection()
 {
+    m_time = std::chrono::high_resolution_clock::now();
+    logResponse();
     m_socket.disconnectFromHost();
     m_content.clear();
+}
+
+void Response::logResponse()
+{
+    std::chrono::high_resolution_clock::time_point start = m_request.time();
+    std::chrono::high_resolution_clock::time_point end = m_time;
+    QString typeTime("s");
+    int time = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+    if (time == 0) {
+        typeTime = "ms";
+        time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    }
+    if (time == 0) {
+        typeTime = "ns";
+        time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    }
+
+    qInfo().noquote()
+            << m_request.method()
+            << m_request.url()
+            << m_statusCode
+            << m_headers["Content-Length"]
+            << QString("%1%2").arg(time).arg(typeTime);
 }
 
 QEX_END_NAMESPACE

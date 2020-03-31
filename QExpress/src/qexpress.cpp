@@ -1,5 +1,7 @@
 #include "qexpress.h"
 #include <iostream>
+#include <QDateTime>
+#include <QFile>
 #include <QDebug>
 
 QString logFileName;
