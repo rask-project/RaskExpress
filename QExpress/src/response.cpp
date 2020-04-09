@@ -118,15 +118,15 @@ void Response::writeByteArray(const QByteArray &data)
 
 void Response::closeConnection()
 {
-    m_time = std::chrono::high_resolution_clock::now();
-    logResponse();
     m_socket.disconnectFromHost();
     m_content.clear();
+    m_time = std::chrono::high_resolution_clock::now();
+    logResponse();
 }
 
 void Response::logResponse()
 {
-    std::chrono::high_resolution_clock::time_point start = m_request.time();
+    std::chrono::high_resolution_clock::time_point start = m_request.time;
     std::chrono::high_resolution_clock::time_point end = m_time;
     QString typeTime("s");
     int time = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
@@ -140,8 +140,8 @@ void Response::logResponse()
     }
 
     qInfo().noquote()
-            << m_request.method()
-            << m_request.url()
+            << m_request.method
+            << m_request.url
             << m_statusCode
             << m_headers["Content-Length"]
             << QString("%1%2").arg(time).arg(typeTime);

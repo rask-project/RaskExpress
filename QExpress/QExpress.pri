@@ -1,9 +1,6 @@
 #QT -= gui
 QT += network gui
 
-TEMPLATE = lib
-DEFINES += QEXPRESS_LIBRARY
-
 QMAKE_CXXFLAGS += -std=c++11
 
 # The following define makes your compiler emit warnings if you use
@@ -42,22 +39,6 @@ HEADERS += \
     $$PWD/src/router.h \
     $$PWD/src/urlparser.h
 
-# Default rules for deployment
-macx {
-    headers.path   = /usr/local/lib/qexpress
-    headers.files += $$HEADERS
-    target.path    = /usr/local/lib
-}
-
-CONFIG(debug, debug|release) {
-    # active log context pour Application::ErrorMessageLog() en mode debug
-    DEFINES += QT_MESSAGELOGCONTEXT
-} else {
-}
-
 QMAKE_CXXFLAGS_RELEASE -= -O1
 QMAKE_CXXFLAGS_RELEASE -= -O2
 QMAKE_CXXFLAGS_RELEASE += -O3
-
-!isEmpty(target.path): INSTALLS += target
-!isEmpty(headers.path): INSTALLS += headers

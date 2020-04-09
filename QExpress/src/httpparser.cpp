@@ -1,6 +1,8 @@
 #include "httpparser.h"
 #include "qexpress_consts.h"
 
+#include <iostream>
+
 #include <QUrl>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -11,14 +13,19 @@
 
 QEX_BEGIN_NAMESPACE
 
-HttpParser::HttpParser(QByteArray &data):
+HttpParser::HttpParser(QTcpSocket *socket, Config &config):
+    m_socket(socket),
+    m_config(config),
     m_valid(false),
+    m_timeout(false),
     m_multiPart(false),
     m_url(),
     m_method(),
+    m_pathName(),
     m_httpVersion(),
     m_contentType(),
     m_contentLength(0),
+    m_bodyParsed(false),
     m_header(),
     m_params(),
     m_body(),
@@ -26,14 +33,54 @@ HttpParser::HttpParser(QByteArray &data):
     m_files()
 {
     m_time = std::chrono::high_resolution_clock::now();
+    QByteArray data = readSocketData();
     if (parseHttpData(data)) {
         parseHeader();
         parseUrl();
         parseBody();
-
-        if (m_multiPart)
-            parseMultiPart();
     }
+
+    if (!m_bodyParsed)
+        waitForBodyData();
+}
+
+QByteArray HttpParser::readSocketData()
+{
+    QByteArray data;
+    if (m_socket->waitForReadyRead(60000)) {
+        try {
+            m_socket->flush();
+            data = m_socket->readAll();
+        } catch (const std::bad_alloc& error) {
+            qCritical() << error.what();
+        }
+    }
+    return data;
+}
+
+void HttpParser::waitForBodyData()
+{
+    int timeout = m_config.config["timeout"].toInt();
+    while (true) {
+        if (m_socket->waitForReadyRead(10)) {
+            try {
+                m_socket->flush();
+                m_bodyData += m_socket->readAll();
+            } catch (const std::bad_alloc& error) {
+                qCritical() << error.what();
+                break;
+            }
+        }
+        int spendTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - m_time).count();
+        if (spendTime >= timeout) {
+            m_timeout = true;
+            break;
+        }
+
+        if (m_contentLength == m_bodyData.size())
+            break;
+    }
+    parseBody();
 }
 
 bool HttpParser::parseHttpData(QByteArray &data)
@@ -42,10 +89,9 @@ bool HttpParser::parseHttpData(QByteArray &data)
     if (index > -1) {
         index += 4;
         const int size = data.size();
-        m_bodyString = data.mid(index, size);
-
+        m_bodyData = data.mid(index, size);
         data.remove(index, size);
-        m_headerString = std::move(data);
+        m_headerData = std::move(data);
 
         m_valid = true;
     } else {
@@ -56,8 +102,8 @@ bool HttpParser::parseHttpData(QByteArray &data)
 
 void HttpParser::parseHeader()
 {
-    m_headerString.replace("\r", "");
-    QByteArrayList lines(m_headerString.split('\n'));
+    m_headerData.replace("\r", "");
+    QByteArrayList lines(m_headerData.split('\n'));
 
     QByteArrayList firstLine;
     if (!lines.empty()) {
@@ -97,11 +143,11 @@ void HttpParser::parseHeader()
     m_multiPart = m_contentType.contains(HTTP::MULTIPART);
 
     if (m_method != HTTP::METHOD::POST && m_method != HTTP::METHOD::PUT && m_method != HTTP::METHOD::PATCH)
-        m_bodyString.clear();
+        m_bodyData.clear();
 
     if (m_header.contains(HTTP::COOKIE))
         extractCookies();
-    m_headerString.clear();
+    m_headerData.clear();
 }
 
 void HttpParser::parseUrl()
@@ -123,49 +169,58 @@ void HttpParser::parseUrl()
 
 void HttpParser::parseBody()
 {
-    if (m_contentType.contains(HTTP::URLENCODED)) {
-        if (m_bodyString.contains("&")) {
-            QByteArrayList bodyAmpersendSplit(m_bodyString.split('&'));
-            for (QByteArray& item: bodyAmpersendSplit) {
-                QByteArrayList itemSplited(item.split('='));
-                if (itemSplited.size() == 2) {
-                    m_body.insert(std::move(itemSplited[0]), std::move(queryDecoded(itemSplited[1])));
-                } else {
-                    m_body.insert(std::move(itemSplited[0]), "");
+    m_maxUploadSize = m_bodyData.size() > m_config.config["maxUploadSize"].toInt();
+    if (m_timeout || m_maxUploadSize)
+        return;
+
+    if (m_bodyData.size() == m_contentLength) {
+        if (m_contentType.contains(HTTP::URLENCODED)) {
+            if (m_bodyData.contains("&")) {
+                QByteArrayList bodyAmpersendSplit(m_bodyData.split('&'));
+                for (QByteArray& item: bodyAmpersendSplit) {
+                    QByteArrayList itemSplited(item.split('='));
+                    if (itemSplited.size() == 2) {
+                        m_body.insert(std::move(itemSplited[0]), std::move(queryDecoded(itemSplited[1])));
+                    } else {
+                        m_body.insert(std::move(itemSplited[0]), "");
+                    }
                 }
+                m_bodyParsed = true;
+            } else {
+                QByteArrayList bodySplited(m_bodyData.split('='));
+                if (bodySplited.size() == 2)
+                    m_body.insert(std::move(bodySplited.first()), std::move(bodySplited.last()));
+                else
+                    m_body.insert(std::move(bodySplited.first()), "");
+                m_bodyParsed = true;
             }
-        } else {
-            QByteArrayList bodySplited(m_bodyString.split('='));
-            if (bodySplited.size() == 2)
-                m_body.insert(std::move(bodySplited.first()), std::move(bodySplited.last()));
-            else
-                m_body.insert(std::move(bodySplited.first()), "");
+        } else if (m_contentType.contains(HTTP::APPLICATION_JSON)) {
+            QJsonDocument doc = QJsonDocument::fromJson(m_bodyData);
+            if (doc.isObject())
+                m_bodyJson = doc.object();
+            else if (doc.isArray())
+                m_bodyJson = doc.array();
+            m_bodyParsed = true;
         }
-    } else if (m_contentType.contains(HTTP::APPLICATION_JSON)) {
-        QJsonDocument doc = QJsonDocument::fromJson(m_bodyString);
-        if (doc.isObject())
-            m_bodyJson = doc.object();
-        else if (doc.isArray())
-            m_bodyJson = doc.array();
+
+        if (m_multiPart)
+            parseMultiPart();
     }
 }
 
 void HttpParser::parseMultiPart()
 {
-//    if (m_bodyString.size() == m_contentLength) {
-//    }
-    QStringList listFormData;
-    QString boundary;
-
-    m_bodyString
+    m_bodyData
             .replace("--" + m_header.value(HTTP::BOUNDARY) + "--\r\n", "")
             .replace("--" + m_header.value(HTTP::BOUNDARY) + "\r\n", "");
 
-    m_bodyString.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
-    int contentFormDataPos = m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
+    int i = 0;
+
+    m_bodyData.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
+    int contentFormDataPos = m_bodyData.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
 
     do {
-        QByteArray item = m_bodyString.mid(0, contentFormDataPos);
+        QByteArray item = m_bodyData.mid(0, contentFormDataPos);
 
         if (item.startsWith(HTTP::FORM_DATA_NAME_EQUAL)) {
             item.remove(0, HTTP::FORM_DATA_NAME_EQUAL.size());
@@ -181,7 +236,7 @@ void HttpParser::parseMultiPart()
 
                 key.replace(HTTP::END_LINE, ";");
                 QByteArrayList fileData(key.trimmed().split(';'));
-                QMultiMap<QByteArray, QByteArray> fileRequest;
+                QMap<QByteArray, QByteArray> fileRequest;
                 for (QByteArray& itemFile: fileData) {
                     if (itemFile.contains(HTTP::FILENAME_EQUAL)) {
                         int filenamePos = itemFile.indexOf(HTTP::FILENAME_EQUAL);
@@ -196,24 +251,21 @@ void HttpParser::parseMultiPart()
                 }
                 fileRequest.insert("content", item);
 
-                QFile file(fieldName + ".jpg");
-                if (!file.open(QIODevice::WriteOnly)) {
-                    qWarning() << "Deu merda em salvar" << file.errorString();
-                } else {
-                    QTextStream in(&file);
-                    in << item;
-                }
-
                 m_files.insert(fieldName, std::move(fileRequest));
             } else {
                 m_body.insert(key, std::move(removeCharsFromEnd(item)));
             }
         }
 
-        m_bodyString.remove(0, contentFormDataPos);
-        m_bodyString.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
-        contentFormDataPos = m_bodyString.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
-    } while (contentFormDataPos > -1);
+        m_bodyData.remove(0, contentFormDataPos);
+        m_bodyData.remove(0, (HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE).size());
+        contentFormDataPos = m_bodyData.indexOf(HTTP::CONTENT_DISPOSITION_COLON_SPACE + HTTP::FORM_DATA_COLON_SPACE);
+        if (contentFormDataPos < 0)
+            contentFormDataPos = m_bodyData.size();
+        ++i;
+    } while (m_bodyData.size());
+
+    m_bodyParsed = true;
 }
 
 void HttpParser::extractCookies()

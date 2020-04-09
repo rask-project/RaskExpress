@@ -1,10 +1,10 @@
 #ifndef URLPARSER_H
 #define URLPARSER_H
 
-#include <QMap>
 #include <QString>
 #include <QStringList>
 #include <QRegularExpression>
+#include "QMap"
 #include "qexpress_global.h"
 
 QEX_BEGIN_NAMESPACE
@@ -14,8 +14,9 @@ class UrlParser
     QString m_urlBase;
     QString m_basePath;
     QString m_pathNameUrlBase;
-    QString m_pathName;
-    QMultiMap<QByteArray, QByteArray> m_params;
+    QByteArray m_pathName;
+//    std::vector<std::pair<QByteArray, QByteArray>> m_params;
+    QMap<QByteArray, QByteArray> m_params;
 
     UrlParser(const UrlParser& other) = delete;
     UrlParser& operator=(const UrlParser& other) = delete;
@@ -25,10 +26,11 @@ public:
     inline void setBasePath(const QString& basePath) { m_basePath = basePath; }
     inline bool basePathMatch() { return m_urlBase.startsWith(m_basePath); }
 
-    inline void setPathName(const QString& pathName) { m_pathName = pathName; }
+    inline QByteArray pathName() { return m_pathName; }
     bool pathNameMatch(const QRegularExpression& regExp, const QStringList& parameters);
 
-    const QMultiMap<QByteArray, QByteArray>& params() { return m_params; }
+//    const std::vector<std::pair<QByteArray, QByteArray>>& params() { return m_params; }
+    const QMap<QByteArray, QByteArray>& params() { return m_params; }
 };
 
 QEX_END_NAMESPACE

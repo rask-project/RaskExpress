@@ -1,7 +1,6 @@
 #include <functional>
 #include <QJsonObject>
 #include <QDataStream>
-#include <iostream>
 #include "httprequest.h"
 #include "httpparser.h"
 #include "request.h"
@@ -26,24 +25,11 @@ HttpRequest::~HttpRequest()
 void HttpRequest::run()
 {
     setSocket();
-
-    m_socket->setReadBufferSize(m_config.config["maxUploadSize"].toInt());
-    if (m_socket->ConnectedState > 0) {
-        if (m_socket->waitForReadyRead()) {
-            QByteArray data;
-            try {
-                m_socket->flush();
-                data = m_socket->readAll();
-            } catch (const std::bad_alloc& error) {
-                qDebug() << "Error:" << error.what();
-            }
-
-            std::cout << data.constData();
-            HttpParser parser(data);
-            routeMatch(parser);
-        }
+    if (m_socket->state() == QTcpSocket::ConnectedState) {
+        HttpParser parser(m_socket, m_config);
+        routeMatch(parser);
     } else {
-        qDebug() << "Connection state:" << m_socket->ConnectedState << m_socket->ConnectingState;
+        qWarning() << "Connection state:" << m_socket->state();
     }
 }
 
@@ -57,6 +43,19 @@ void HttpRequest::routeMatch(HttpParser &parser)
 {
     Request request(parser);
     Response response(*m_socket, request);
+
+    if (parser.timeout()) {
+        response.status(HTTP::STATUS::CODE::RequestTimeout);
+        response.send(HTTP::STATUS::TEXT(HTTP::STATUS::CODE::RequestTimeout));
+        return;
+    }
+
+    if (parser.maxUploadSize()) {
+        response.status(HTTP::STATUS::CODE::PayloadTooLarge);
+        response.send(HTTP::STATUS::TEXT(HTTP::STATUS::CODE::PayloadTooLarge));
+        return;
+    }
+
     if (!parser.isValid()) {
         response.status(HTTP::STATUS::CODE::BadRequest);
         response.send(HTTP::STATUS::TEXT(HTTP::STATUS::CODE::BadRequest));
@@ -75,6 +74,7 @@ void HttpRequest::routeMatch(HttpParser &parser)
             for (const auto& route: router.second->routes()) {
                 bool requestFound = (method == route.method && urlParser.pathNameMatch(route.regExp, route.parameters));
                 if (requestFound) {
+                    parser.setPathName(urlParser.pathName());
                     parser.setParams(urlParser.params());
 
                     if (!runMiddlewares(route.middlewares, request, response))
